@@ -1,0 +1,170 @@
+// ============================================================
+//  NETFLIX AUTH – Google Apps Script (JSON API Edition)
+//  Dùng kèm với frontend Netlify, trả về JSON/JSONP
+//  Hỗ trợ nhiều tài khoản forward về 1 Gmail qua Label + lọc email body
+// ============================================================
+
+// ===== CẤU HÌNH TÀI KHOẢN =====
+const ACCOUNTS = [
+  { token: "abc123", email: "leli67888@gmail.com", name: "TK01", label: "N32" },
+  { token: "xyz789", email: "qngo034@gmail.com",   name: "TK02", label: "N02" },
+  { token: "n14310806", email: "vo649244@gmail.com",  name: "vo649244@gmail.com", label: "N23" },
+  { token: "n17300806", email: "le173046@gmail.com",  name: "le173046@gmail.com", label: "N05" },
+  { token: "n17360806", email: "an258889@gmail.com",  name: "an258889@gmail.com", label: "N22" },
+  { token: "n184420", email: "ngove866@gmail.com",  name: "ngove866@gmail.com", label: "N27" },
+  { token: "n567896", email: "donle4775@gmail.com",  name: "donle4775@gmail.com", label: "N10" },
+  { token: "n365113", email: "letoantin833@gmail.com",  name: "letoantin833@gmail.com", label: "N01" },
+  { token: "n036210", email: "tub4129@gmail.com",  name: "tub4129@gmail.com", label: "N25" },
+  // Thêm tiếp tương tự...
+];
+
+// ===== CẤU HÌNH CHUNG =====
+const CONFIG = {
+  emailNewerThan: "1d",   // GmailApp lấy email trong ngày
+  withinMinutes:  30,     // Chỉ lấy email trong vòng 30 phút gần nhất
+  maxThreads:     10,     // Số thread tối đa lấy từ Gmail
+  timezone:       "Asia/Ho_Chi_Minh",
+  dateFormat:     "HH:mm dd/MM/yyyy",
+};
+
+// ===== XỬ LÝ REQUEST =====
+function doGet(e) {
+  const token    = e.parameter.t;
+  const callback = e.parameter.callback;
+  const debug    = e.parameter.debug;
+
+  // --- Chế độ debug ---
+  if (debug === "temp") {
+    return sendJson({ type: "temp", link: "https://www.netflix.com", time: "09:00 08/06/2026", name: "TEST" }, callback);
+  }
+  if (debug === "household") {
+    return sendJson({ type: "household", link: "https://www.netflix.com", time: "08:00 08/06/2026", name: "TEST" }, callback);
+  }
+  if (debug === "empty") {
+    return sendJson({ type: null, link: null, time: null, name: "TEST" }, callback);
+  }
+
+  // --- Xác thực token ---
+  if (!token) {
+    return sendJson({ error: "Thiếu token xác thực" }, callback);
+  }
+
+  const account = ACCOUNTS.find(a => a.token === token);
+  if (!account) {
+    return sendJson({ error: "Link không hợp lệ hoặc đã hết hạn" }, callback);
+  }
+
+  // --- Lấy email và trả kết quả ---
+  const data = getLatestNetflixEmail(account.label, account.email);
+  return sendJson({
+    name:  account.name,
+    type:  data.type  || null,
+    link:  data.link  || null,
+    time:  data.time  || null,
+    error: data.error || null,
+  }, callback);
+}
+
+// ===== GỬI PHẢN HỒI JSON / JSONP =====
+function sendJson(obj, callback) {
+  const json = JSON.stringify(obj);
+  if (callback) {
+    return ContentService
+      .createTextOutput(callback + "(" + json + ");")
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService
+    .createTextOutput(json)
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ===== ĐỌC EMAIL NETFLIX THEO LABEL + LỌC BODY =====
+function getLatestNetflixEmail(label, email) {
+  try {
+    const query   = `from:info@account.netflix.com label:${label} newer_than:${CONFIG.emailNewerThan}`;
+    const threads = GmailApp.search(query, 0, CONFIG.maxThreads);
+
+    if (!threads.length) {
+      return { type: null, link: null, time: null };
+    }
+
+    // Gom tất cả tin nhắn, sắp xếp mới nhất trước
+    const allMessages = [];
+    threads.forEach(t => t.getMessages().forEach(m => allMessages.push(m)));
+    allMessages.sort((a, b) => b.getDate() - a.getDate());
+
+    // Lọc 1: chỉ lấy email trong vòng withinMinutes phút gần nhất
+    const cutoff = new Date(Date.now() - CONFIG.withinMinutes * 60 * 1000);
+    const recentMessages = allMessages.filter(m => m.getDate() >= cutoff);
+
+    if (!recentMessages.length) {
+      return { type: null, link: null, time: null };
+    }
+
+    // Lọc 2: kiểm tra body có chứa email gốc của tài khoản không
+    // → đảm bảo không lấy nhầm email của TK khác dù cùng label
+    const ownMessages = recentMessages.filter(m => {
+      const body = m.getBody();
+      return body.indexOf(email) !== -1;
+    });
+
+    if (!ownMessages.length) {
+      return { type: null, link: null, time: null };
+    }
+
+    // Lọc 3: chỉ lấy đúng 2 loại email xác thực, KHÔNG fallback
+    const targetMsg = ownMessages.find(m => {
+      const subj = m.getSubject();
+      return /truy cập tạm thời|temporary access|mã truy cập|cách cập nhật hộ gia đình|update your netflix household|lưu ý quan trọng/i.test(subj);
+    });
+
+    // Không tìm thấy đúng loại → hiện "chưa có thư mới"
+    if (!targetMsg) {
+      return { type: null, link: null, time: null };
+    }
+
+    const subject  = targetMsg.getSubject();
+    const htmlBody = targetMsg.getBody();
+    const date     = targetMsg.getDate();
+
+    // Phân loại email
+    const isTempAccess = /truy cập tạm thời|temporary access|mã truy cập/i.test(subject);
+    const isHousehold  = /cách cập nhật hộ gia đình|update your netflix household|lưu ý quan trọng/i.test(subject);
+    const emailType    = isTempAccess ? "temp" : isHousehold ? "household" : "other";
+
+    // Trích xuất link xác thực
+    const authLink = extractAuthLink(htmlBody);
+
+    return {
+      type: emailType,
+      link: authLink,
+      time: date ? Utilities.formatDate(date, CONFIG.timezone, CONFIG.dateFormat) : null,
+    };
+  } catch (err) {
+    Logger.log("getLatestNetflixEmail error: " + err.message);
+    return { type: null, link: null, time: null, error: err.message };
+  }
+}
+
+// ===== TRÍCH XUẤT LINK XÁC THỰC =====
+function extractAuthLink(htmlBody) {
+  const allLinks = [];
+  const linkRegex = /href="(https:\/\/www\.netflix\.com\/[^"]+)"/gi;
+  let m;
+
+  while ((m = linkRegex.exec(htmlBody)) !== null) {
+    allLinks.push(m[1]);
+  }
+
+  // Loại bỏ link không liên quan
+  const filtered = allLinks.filter(l =>
+    !/unsubscribe|help|terms|privacy|legal|mailto/i.test(l)
+  );
+
+  // Ưu tiên link có từ khóa xác thực
+  const authLink = filtered.find(l =>
+    /temp|access|mfa|login|verify|getcode|auth|household|update|confirm/i.test(l)
+  ) || filtered[0] || null;
+
+  return authLink;
+}
