@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Accs.vn ZL: 0393772340</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: sans-serif;
+      background: #141414;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+    .card {
+      background: #1f1f1f;
+      border-radius: 12px;
+      padding: 2rem 2.5rem;
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+    }
+    .logo { color: #e50914; font-size: 30px; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { color: #aaa; font-size: 13px; margin-bottom: 1.5rem; }
+    .tag { display: inline-block; font-size: 11px; font-weight: 500; padding: 3px 10px;
+      border-radius: 20px; margin-bottom: 1rem; }
+    .tag-temp { background: #2a2a2a; color: #f5a623; border: 1px solid #f5a623; }
+    .tag-household { background: #2a2a2a; color: #4caf50; border: 1px solid #4caf50; }
+    .empty { color: #666; font-size: 15px; padding: 1.5rem 0; line-height: 1.8; }
+    .time { color: #888; font-size: 12px; margin-bottom: 1.25rem; }
+    .btn-link { display: block; background: #e50914; color: #fff; padding: 1rem;
+      border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 500; line-height: 1.4; }
+    .btn-link:hover { background: #b30710; }
+    .note { color: #666; font-size: 11px; margin-top: 0.75rem; line-height: 1.6; }
+    .notice-box {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-top: 1rem;
+      text-align: left;
+    }
+    .notice-box p {
+      color: #888;
+      font-size: 11px;
+      line-height: 1.7;
+    }
+    .notice-box p span {
+      color: #f5a623;
+      font-weight: 600;
+    }
+    .divider { border: none; border-top: 1px solid #2a2a2a; margin: 1.5rem 0; }
+    .countdown-box { display: flex; align-items: center; justify-content: center;
+      gap: 8px; color: #555; font-size: 12px; }
+    .countdown-circle { position: relative; width: 36px; height: 36px; }
+    .countdown-circle svg { transform: rotate(-90deg); }
+    .countdown-circle .bg { fill: none; stroke: #2a2a2a; stroke-width: 3; }
+    .countdown-circle .progress { fill: none; stroke: #e50914; stroke-width: 3;
+      stroke-linecap: round; stroke-dasharray: 88; stroke-dashoffset: 0; transition: stroke-dashoffset 1s linear; }
+    .countdown-circle .num { position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%); font-size: 11px; font-weight: 500; color: #aaa; }
+    .refresh-btn { background: none; border: 1px solid #333; color: #888; font-size: 12px;
+      padding: 5px 12px; border-radius: 6px; cursor: pointer; margin-left: 4px; }
+    .refresh-btn:hover { border-color: #555; color: #aaa; }
+    .spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid #333;
+      border-top-color: #e50914; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 1rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: #666; font-size: 14px; }
+    .error-box { color: #e50914; font-size: 14px; padding: 1rem 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">NETFLIX</div>
+    <div class="subtitle" id="subtitle">Đang xác thực...</div>
+
+    <div id="loading" style="padding: 1.5rem 0;">
+      <div class="spinner"></div>
+      <div class="loading-text">Đang tải email vui lòng đợi...</div>
+    </div>
+
+    <div id="content" style="display:none"></div>
+
+    <hr class="divider">
+    <div class="countdown-box">
+      <div class="countdown-circle">
+        <svg width="36" height="36" viewBox="0 0 36 36">
+          <circle class="bg" cx="18" cy="18" r="14"/>
+          <circle class="progress" id="ring" cx="18" cy="18" r="14"/>
+        </svg>
+        <div class="num" id="countdown">90</div>
+      </div>
+      <span>Tự tải lại sau <b id="sec">90</b> giây</span>
+      <button class="refresh-btn" onclick="fetchData()">Tải ngay</button>
+    </div>
+  </div>
+
+<script>
+  // ===== ĐỔI URL NÀY THÀNH URL GAS CỦA BẠN =====
+  var GAS_URL = "https://script.google.com/macros/s/AKfycbzvGhldHO5vQTVg8u7UPINKk144r9fq4Kzg9mehtXKZazovshGyGvkc7WSYs9sP8rU5qw/exec";
+
+  var params = new URLSearchParams(window.location.search);
+  var token = params.get("t") || "";
+
+  function fetchData() {
+    resetCountdown();
+    document.getElementById("loading").style.display = "block";
+    document.getElementById("content").style.display = "none";
+
+    var cbName = "cb_" + Date.now();
+    var script = document.createElement("script");
+    script.src = GAS_URL + "?t=" + encodeURIComponent(token) + "&callback=" + cbName;
+
+    window[cbName] = function(data) {
+      delete window[cbName];
+      document.body.removeChild(script);
+      renderData(data);
+    };
+
+    script.onerror = function() {
+      delete window[cbName];
+      document.body.removeChild(script);
+      renderError("Không thể kết nối. Vui lòng thử lại.");
+    };
+
+    document.body.appendChild(script);
+  }
+
+  function renderData(data) {
+    document.getElementById("loading").style.display = "none";
+    var content = document.getElementById("content");
+    content.style.display = "block";
+
+    if (data.error) { renderError(data.error); return; }
+
+    var name = data.name || "TK";
+    document.getElementById("subtitle").textContent = "Xác thực tài khoản • " + name;
+    document.title = "Netflix – " + name;
+
+    var html = "";
+
+    if (data.time) {
+      html += '<p class="time">📧 Email nhận lúc ' + data.time + '</p>';
+    }
+
+    if (data.link) {
+      var tag = "", btnText = "", note = "";
+      if (data.type === "temp") {
+        tag = '<div class="tag tag-temp">Mã truy cập tạm thời</div>';
+        btnText = "📩 Nhấn để nhận mã truy cập tạm thời";
+        note = "Liên kết hết hạn sau 15 phút";
+      } else if (data.type === "household") {
+        tag = '<div class="tag tag-household">Cập nhật Hộ gia đình</div>';
+        btnText = "✅ Ấn vào đây => để Cập nhật Hộ gia đình NETFLIX trên TIVI";
+        note = "Nhấn để xác nhận và cập nhật Hộ gia đình Netflix";
+      } else {
+        btnText = "📩 Nhấn để xác thực Netflix";
+        note = "Liên kết chỉ dùng được 1 lần và hết hạn sau 15 phút";
+      }
+      html += tag;
+      html += '<a href="' + data.link + '" class="btn-link" target="_blank">' + btnText + '</a>';
+      html += '<p class="note">' + note + '</p>';
+    } else {
+      html += '<div class="empty">Chưa có email mới<br><span style="font-size:13px">Qúy khách ấn nút "GỬI EMAIL" trên thiết bị cần xem rồi tải lại web này để lấy mã, vui lòng không spam liên tục !!</span></div>';
+    }
+
+    // Ghi chú hướng dẫn luôn hiển thị bên dưới
+    html += '<div class="notice-box">';
+    html += '<p>• Trên <span>ĐT, Laptop</span> quý khách <span> XEM TẠM THỜI </span> → <span>GỬI EMAIL</span> rồi load lại link này để lấy mã.</p>';
+    html += '<p style="margin-top:6px">• Quý khách vui lòng <span>không SPAM</span> ấn yêu cầu liên tục trên thiết bị.</p>';
+    html += '</div>';
+
+    content.innerHTML = html;
+  }
+
+  function renderError(msg) {
+    document.getElementById("loading").style.display = "none";
+    var content = document.getElementById("content");
+    content.style.display = "block";
+    content.innerHTML = '<div class="error-box">⛔ ' + msg + '</div>';
+  }
+
+  // ===== COUNTDOWN 90 giây =====
+  var total = 90, left = total;
+  var ring = document.getElementById("ring");
+  var secEl = document.getElementById("sec");
+  var numEl = document.getElementById("countdown");
+  var timer;
+
+  function resetCountdown() {
+    clearInterval(timer);
+    left = total;
+    secEl.textContent = left;
+    numEl.textContent = left;
+    ring.style.strokeDashoffset = 0;
+    timer = setInterval(function() {
+      left--;
+      secEl.textContent = left;
+      numEl.textContent = left;
+      ring.style.strokeDashoffset = 88 * (1 - left / total);
+      if (left <= 0) { clearInterval(timer); fetchData(); }
+    }, 1000);
+  }
+
+  // Khởi chạy
+  fetchData();
+</script>
+</body>
+</html>
